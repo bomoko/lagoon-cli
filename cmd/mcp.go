@@ -47,26 +47,6 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		}
 
 		// ------------------------------------------------------------------ //
-		// Tool: whoami
-		// ------------------------------------------------------------------ //
-		lagoonMCPServer.Server.AddTool(
-			mcp.NewTool("whoami",
-				mcp.WithDescription("Return information about the currently authenticated Lagoon user"),
-			),
-			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				user, err := lagoon.Me(ctx, lagoonMCPServer.NewLagoonClient())
-				if err != nil {
-					return mcp.NewToolResultError(err.Error()), nil
-				}
-				out, err := json.MarshalIndent(user, "", "  ")
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
-				}
-				return mcp.NewToolResultText(string(out)), nil
-			},
-		)
-
-		// ------------------------------------------------------------------ //
 		// Tool: list_projects
 		// ------------------------------------------------------------------ //
 		lagoonMCPServer.Server.AddTool(

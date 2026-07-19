@@ -37,8 +37,19 @@ func NewLagoonMCPServer(lagoonCtx config.Context, cliVersion string) (*LagoonMCP
 		server.WithRecovery(),
 	)
 
-	return &LagoonMCPServer{
+	server := &LagoonMCPServer{
 		Server:          s,
 		NewLagoonClient: newClient,
-	}, nil
+	}
+
+	//let's register all MCP tools etc.
+	for _, t := range lMCPRegistratorRegistry {
+		t(server)
+	}
+
+	return server, nil
 }
+
+type LagoonMCPRegistrator func(*LagoonMCPServer)
+
+var lMCPRegistratorRegistry []LagoonMCPRegistrator
