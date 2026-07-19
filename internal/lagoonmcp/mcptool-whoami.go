@@ -31,5 +31,5 @@ func mcpToolWhoAmI(lagoonMCPServer *LagoonMCPServer) {
 }
 
 func init() {
-	lMCPRegistratorRegistry = append(lMCPRegistratorRegistry, mcpToolWhoAmI)
+	toolRegistrations = append(toolRegistrations, mcpToolWhoAmI)
 }

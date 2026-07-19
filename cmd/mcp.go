@@ -1,16 +1,11 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"log"
 
-	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
 	"github.com/uselagoon/lagoon-cli/internal/lagoonmcp"
-	"github.com/uselagoon/machinery/api/lagoon"
 )
 
 var mcpCmd = &cobra.Command{
@@ -46,58 +41,11 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 			log.Fatal(err.Error())
 		}
 
-		// ------------------------------------------------------------------ //
-		// Tool: list_projects
-		// ------------------------------------------------------------------ //
-		lagoonMCPServer.Server.AddTool(
-			mcp.NewTool("list_projects",
-				mcp.WithDescription("List all Lagoon projects the current user has access to"),
-			),
-			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				projects, err := lagoon.ListAllProjects(ctx, lagoonMCPServer.NewLagoonClient())
-				if err != nil {
-					return mcp.NewToolResultError(err.Error()), nil
-				}
-				out, err := json.MarshalIndent(projects, "", "  ")
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
-				}
-				return mcp.NewToolResultText(string(out)), nil
-			},
-		)
+		// All tools are registered automatically via init() functions in
+		// internal/lagoonmcp/tools_*.go — nothing to wire here.
 
-		// ------------------------------------------------------------------ //
-		// Tool: list_environments
-		// ------------------------------------------------------------------ //
-		lagoonMCPServer.Server.AddTool(
-			mcp.NewTool("list_environments",
-				mcp.WithDescription("List all environments for a given Lagoon project"),
-				mcp.WithString("project",
-					mcp.Required(),
-					mcp.Description("Name of the Lagoon project"),
-				),
-			),
-			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				projectName, err := req.RequireString("project")
-				if err != nil {
-					return mcp.NewToolResultError(err.Error()), nil
-				}
-				envs, err := lagoon.GetEnvironmentsByProjectName(ctx, projectName, lagoonMCPServer.NewLagoonClient())
-				if err != nil {
-					return mcp.NewToolResultError(err.Error()), nil
-				}
-				out, err := json.MarshalIndent(envs, "", "  ")
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("marshal error: %v", err)), nil
-				}
-				return mcp.NewToolResultText(string(out)), nil
-			},
-		)
-
-		// ------------------------------------------------------------------ //
 		// Start the STDIO server — all MCP traffic flows over stdin/stdout.
 		// Nothing else should write to stdout once ServeStdio is called.
-		// ------------------------------------------------------------------ //
 		return server.ServeStdio(lagoonMCPServer.Server)
 	},
 }
