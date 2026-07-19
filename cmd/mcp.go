@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -11,6 +12,36 @@ import (
 	"github.com/uselagoon/machinery/api/lagoon"
 	lclient "github.com/uselagoon/machinery/api/lagoon/client"
 )
+
+type LagoonMCPServer struct {
+	Server          *server.MCPServer
+	NewLagoonClient func() *lclient.Client
+}
+
+func NewLagoonMCPServer(currentLagoon, token string) (*LagoonMCPServer, error) {
+	var lagoonMcpServer LagoonMCPServer
+	// newClient creates a fresh lagoon API client.
+	// We create one per tool call so that token refreshes are picked up.
+	lagoonMcpServer.NewLagoonClient = func() *lclient.Client {
+		return lclient.New(
+			lagoonCLIConfig.Lagoons[currentLagoon].GraphQL,
+			lagoonCLIVersion,
+			lagoonCLIConfig.Lagoons[currentLagoon].Version,
+			&token,
+			false,
+		)
+	}
+
+	s := server.NewMCPServer(
+		"Lagoon CLI MCP Server",
+		lagoonCLIVersion,
+		server.WithToolCapabilities(false),
+		server.WithRecovery(),
+	)
+	lagoonMcpServer.Server = s
+
+	return &lagoonMcpServer, nil
+}
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
@@ -41,34 +72,20 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		current := lagoonCLIConfig.Current
 		token := lagoonCLIConfig.Lagoons[current].Token
 
-		// newClient creates a fresh lagoon API client.
-		// We create one per tool call so that token refreshes are picked up.
-		newClient := func() *lclient.Client {
-			return lclient.New(
-				lagoonCLIConfig.Lagoons[current].GraphQL,
-				lagoonCLIVersion,
-				lagoonCLIConfig.Lagoons[current].Version,
-				&token,
-				false,
-			)
+		lagoonMCPServer, err := NewLagoonMCPServer(current, token)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
-
-		s := server.NewMCPServer(
-			"Lagoon CLI MCP Server",
-			lagoonCLIVersion,
-			server.WithToolCapabilities(false),
-			server.WithRecovery(),
-		)
 
 		// ------------------------------------------------------------------ //
 		// Tool: whoami
 		// ------------------------------------------------------------------ //
-		s.AddTool(
+		lagoonMCPServer.Server.AddTool(
 			mcp.NewTool("whoami",
 				mcp.WithDescription("Return information about the currently authenticated Lagoon user"),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				user, err := lagoon.Me(ctx, newClient())
+				user, err := lagoon.Me(ctx, lagoonMCPServer.NewLagoonClient())
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
@@ -83,12 +100,12 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		// ------------------------------------------------------------------ //
 		// Tool: list_projects
 		// ------------------------------------------------------------------ //
-		s.AddTool(
+		lagoonMCPServer.Server.AddTool(
 			mcp.NewTool("list_projects",
 				mcp.WithDescription("List all Lagoon projects the current user has access to"),
 			),
 			func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				projects, err := lagoon.ListAllProjects(ctx, newClient())
+				projects, err := lagoon.ListAllProjects(ctx, lagoonMCPServer.NewLagoonClient())
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
@@ -103,7 +120,7 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		// ------------------------------------------------------------------ //
 		// Tool: list_environments
 		// ------------------------------------------------------------------ //
-		s.AddTool(
+		lagoonMCPServer.Server.AddTool(
 			mcp.NewTool("list_environments",
 				mcp.WithDescription("List all environments for a given Lagoon project"),
 				mcp.WithString("project",
@@ -116,7 +133,7 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
-				envs, err := lagoon.GetEnvironmentsByProjectName(ctx, projectName, newClient())
+				envs, err := lagoon.GetEnvironmentsByProjectName(ctx, projectName, lagoonMCPServer.NewLagoonClient())
 				if err != nil {
 					return mcp.NewToolResultError(err.Error()), nil
 				}
@@ -132,7 +149,7 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		// Start the STDIO server — all MCP traffic flows over stdin/stdout.
 		// Nothing else should write to stdout once ServeStdio is called.
 		// ------------------------------------------------------------------ //
-		return server.ServeStdio(s)
+		return server.ServeStdio(lagoonMCPServer.Server)
 	},
 }
 
