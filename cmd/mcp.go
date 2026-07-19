@@ -9,39 +9,9 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"
+	"github.com/uselagoon/lagoon-cli/internal/lagoonmcp"
 	"github.com/uselagoon/machinery/api/lagoon"
-	lclient "github.com/uselagoon/machinery/api/lagoon/client"
 )
-
-type LagoonMCPServer struct {
-	Server          *server.MCPServer
-	NewLagoonClient func() *lclient.Client
-}
-
-func NewLagoonMCPServer(currentLagoon, token string) (*LagoonMCPServer, error) {
-	var lagoonMcpServer LagoonMCPServer
-	// newClient creates a fresh lagoon API client.
-	// We create one per tool call so that token refreshes are picked up.
-	lagoonMcpServer.NewLagoonClient = func() *lclient.Client {
-		return lclient.New(
-			lagoonCLIConfig.Lagoons[currentLagoon].GraphQL,
-			lagoonCLIVersion,
-			lagoonCLIConfig.Lagoons[currentLagoon].Version,
-			&token,
-			false,
-		)
-	}
-
-	s := server.NewMCPServer(
-		"Lagoon CLI MCP Server",
-		lagoonCLIVersion,
-		server.WithToolCapabilities(false),
-		server.WithRecovery(),
-	)
-	lagoonMcpServer.Server = s
-
-	return &lagoonMcpServer, nil
-}
 
 var mcpCmd = &cobra.Command{
 	Use:   "mcp",
@@ -70,9 +40,8 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		current := lagoonCLIConfig.Current
-		token := lagoonCLIConfig.Lagoons[current].Token
 
-		lagoonMCPServer, err := NewLagoonMCPServer(current, token)
+		lagoonMCPServer, err := lagoonmcp.NewLagoonMCPServer(lagoonCLIConfig.Lagoons[current], lagoonCLIVersion)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
