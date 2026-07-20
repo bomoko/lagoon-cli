@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -108,9 +109,8 @@ func init() {
 				}
 
 				if len(projects) == 0 {
-					return mcp.NewToolResultText(
-						"no Lagoon projects found matching the git remotes in this directory",
-					), nil
+
+					return mcp.NewToolResultText(fmt.Sprintf("no Lagoon projects found matching the git remotes (%v) in this directory", strings.Join(urls, ","))), nil
 				}
 
 				out, err := json.MarshalIndent(projects, "", "  ")
