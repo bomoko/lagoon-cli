@@ -10,40 +10,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// projectByGitURLQuery fetches a project by its git remote URL.
-// machinery has no wrapper for this query so we use ProcessRaw.
-const projectByGitURLQuery = `query ($gitUrl: String!) {
-  projectByGitUrl(gitUrl: $gitUrl) {
-    id
-    name
-    gitUrl
-    productionEnvironment
-    developmentEnvironmentsLimit
-    environments {
-      id
-      name
-      environmentType
-      route
-    }
-  }
-}`
-
-// resolvedProject is a minimal projection of the Lagoon Project type
-// containing the fields returned by projectByGitURLQuery.
-type resolvedProject struct {
-	ID                           uint   `json:"id"`
-	Name                         string `json:"name"`
-	GitURL                       string `json:"gitUrl"`
-	ProductionEnvironment        string `json:"productionEnvironment"`
-	DevelopmentEnvironmentsLimit int    `json:"developmentEnvironmentsLimit"`
-	Environments                 []struct {
-		ID              uint   `json:"id"`
-		Name            string `json:"name"`
-		EnvironmentType string `json:"environmentType"`
-		Route           string `json:"route"`
-	} `json:"environments"`
-}
-
 func init() {
 	toolRegistrations = append(toolRegistrations, func(s *LagoonMCPServer) {
 		s.Server.AddTool(
