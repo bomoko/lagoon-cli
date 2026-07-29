@@ -49,47 +49,17 @@ func init() {
 						return mcp.NewToolResultError(fmt.Sprintf("failed to get project %q: %v", projectName, err)), nil
 					}
 					project = p
+					s.setProjectResource(*p, "")
 				} else {
-					// Call the resolve_project tool - alternatively we could extract the logic from resolve_project into a shared file? Need to check mcp best practice
-					resolveTool := s.Server.GetTool("resolve_project")
-					if resolveTool == nil {
-						return mcp.NewToolResultError("resolve_project tool not found"), nil
-					}
-
-					resolveResult, err := resolveTool.Handler(ctx, mcp.CallToolRequest{
-						Params: mcp.CallToolParams{
-							Name: "resolve_project",
-							Arguments: map[string]any{
-								"path": path,
-							},
-						},
-					})
+					projects, err := getProjectsByPath(ctx, lc, path)
 					if err != nil {
-						return mcp.NewToolResultError(fmt.Sprintf("resolve_project failed: %v", err)), nil
+						return mcp.NewToolResultError(err.Error()), nil
 					}
-					if resolveResult.IsError {
-						return resolveResult, nil
-					}
-
-					if len(resolveResult.Content) == 0 {
-						return mcp.NewToolResultError("resolve_project returned no content"), nil
-					}
-
-					textContent, ok := resolveResult.Content[0].(mcp.TextContent)
-					if !ok {
-						return mcp.NewToolResultError("resolve_project returned unexpected content type"), nil
-					}
-
-					var projects []resolvedProject
-					if err := json.Unmarshal([]byte(textContent.Text), &projects); err != nil {
-						return mcp.NewToolResultText(textContent.Text), nil
-					}
-
 					if len(projects) == 0 {
 						return mcp.NewToolResultError("no projects found"), nil
 					}
-
 					project = &projects[0]
+					s.setProjectResource(*project, path)
 				}
 
 				// Only checking the prod route - at least as a first pass
@@ -141,33 +111,6 @@ func init() {
 			},
 		)
 	})
-}
-
-func getProjectByName(ctx context.Context, lc *lclient.Client, name string) (*resolvedProject, error) {
-	raw, err := lc.ProcessRaw(ctx, projectByNameQuery, map[string]interface{}{
-		"name": name,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := json.Marshal(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	var resp struct {
-		ProjectByName *resolvedProject `json:"projectByName"`
-	}
-	if err := json.Unmarshal(b, &resp); err != nil {
-		return nil, err
-	}
-
-	if resp.ProjectByName == nil {
-		return nil, fmt.Errorf("project %q not found", name)
-	}
-
-	return resp.ProjectByName, nil
 }
 
 func pingRoute(url string) *routeStatus {

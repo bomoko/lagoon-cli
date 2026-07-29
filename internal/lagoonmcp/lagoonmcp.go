@@ -37,6 +37,7 @@ func NewLagoonMCPServer(lagoonCtx config.Context, cliVersion string) (*LagoonMCP
 		"Lagoon CLI MCP Server",
 		cliVersion,
 		server.WithToolCapabilities(false),
+		server.WithResourceCapabilities(false, true),
 		server.WithRecovery(),
 	)
 
