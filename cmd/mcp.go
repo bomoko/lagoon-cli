@@ -44,6 +44,17 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 		// All tools are registered automatically via init() functions in
 		// internal/lagoonmcp/tools_*.go — nothing to wire here.
 
+		httpAddr, err := cmd.Flags().GetString("http")
+		if err != nil {
+			return err
+		}
+
+		// For local dev/testing - use 'npx @modelcontextprotocol/inspector@latest' once server is running
+		if httpAddr != "" {
+			log.Printf("Starting on http://localhost%s/mcp", httpAddr)
+			return server.NewStreamableHTTPServer(lagoonMCPServer.Server).Start(httpAddr)
+		}
+
 		// Start the STDIO server — all MCP traffic flows over stdin/stdout.
 		// Nothing else should write to stdout once ServeStdio is called.
 		return server.ServeStdio(lagoonMCPServer.Server)
@@ -52,4 +63,5 @@ Example Claude Desktop config (~/.config/claude/claude_desktop_config.json):
 
 func init() {
 	// mcpCmd is registered in root.go's init() via rootCmd.AddCommand(mcpCmd).
+	mcpCmd.Flags().String("http", "", "Serve HTTP on the provided address instead of stdio")
 }
