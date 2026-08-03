@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -23,7 +22,7 @@ type RouteCheckResult struct {
 func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 	lagoonMCPServer.Server.AddTool(
 		mcp.NewTool("verify_route",
-			mcp.WithDescription("Verify the TLS certificate for the primary route of a Lagoon project environment"),
+			mcp.WithDescription("Verify the TLS certificate and HTTP response for the primary route of a Lagoon project environment"),
 			mcp.WithString("project",
 				mcp.Required(),
 				mcp.Description("Name of the Lagoon project"),
@@ -49,17 +48,20 @@ func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get project %q: %v", projectName, err)), nil
 			}
 
-			var route string
-			for _, env := range project.Environments {
-				if env.Name == environmentName {
-					route = env.Route
+			var foundEnv *resolvedEnvironment
+			for i := range project.Environments {
+				if project.Environments[i].Name == environmentName {
+					foundEnv = &project.Environments[i]
 					break
 				}
 			}
-
-			if route == "" {
-				return mcp.NewToolResultError(fmt.Sprintf("environment %q in project %q has no primary route", environmentName, projectName)), nil
+			if foundEnv == nil {
+				return mcp.NewToolResultError(fmt.Sprintf("environment %q not found in project %q", environmentName, projectName)), nil
 			}
+			if foundEnv.Route == "" {
+				return mcp.NewToolResultError(fmt.Sprintf("environment %q in project %q has no primary route set", environmentName, projectName)), nil
+			}
+			route := foundEnv.Route
 
 			result, err := CheckRoute(ctx, route)
 			if err != nil {
@@ -84,25 +86,24 @@ func CheckRoute(ctx context.Context, route string) (RouteCheckResult, error) {
 		return result, err
 	}
 
-	var port int64
-	if u.Port() != "" {
-		port, err = strconv.ParseInt(u.Port(), 10, 0)
-		if err != nil {
-			return result, err
+	// port 0 is handled by assertCertGood (defaults to 443)
+	var port int
+	if p := u.Port(); p != "" {
+		if _, err := fmt.Sscanf(p, "%d", &port); err != nil {
+			return result, fmt.Errorf("invalid port %q: %w", p, err)
 		}
 	}
 
-	if err := assertCertGood(ctx, u.Hostname(), int(port)); err != nil {
+	if err := assertCertGood(ctx, u.Hostname(), port); err != nil {
 		result.CertError = err.Error()
 	} else {
 		result.CertValid = true
 	}
 
 	status, err := assertRouteOK(ctx, route)
+	result.HTTPStatus = status // populated even on non-200 errors
 	if err != nil {
 		result.HTTPError = err.Error()
-	} else {
-		result.HTTPStatus = status
 	}
 
 	return result, nil
