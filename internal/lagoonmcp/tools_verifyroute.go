@@ -12,11 +12,13 @@ import (
 )
 
 type RouteCheckResult struct {
-	Route      string `json:"route"`
-	CertValid  bool   `json:"certValid"`
-	CertError  string `json:"certError,omitempty"`
-	HTTPStatus int    `json:"httpStatus,omitempty"`
-	HTTPError  string `json:"httpError,omitempty"`
+	Project     string `json:"project"`
+	Environment string `json:"environment"`
+	Route       string `json:"route"`
+	CertValid   bool   `json:"certValid"`
+	CertError   string `json:"certError,omitempty"`
+	HTTPStatus  int    `json:"httpStatus,omitempty"`
+	HTTPError   string `json:"httpError,omitempty"`
 }
 
 func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
@@ -28,8 +30,7 @@ func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 				mcp.Description("Name of the Lagoon project"),
 			),
 			mcp.WithString("environment",
-				mcp.Required(),
-				mcp.Description("Name of the environment"),
+				mcp.Description("Name of the environment; defaults to the production environment"),
 			),
 		),
 		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -37,10 +38,7 @@ func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
-			environmentName, err := req.RequireString("environment")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
+			environmentName := req.GetString("environment", "")
 
 			lc := lagoonMCPServer.NewLagoonClient()
 			project, err := getProjectByName(ctx, lc, projectName)
@@ -50,12 +48,23 @@ func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 
 			var foundEnv *resolvedEnvironment
 			for i := range project.Environments {
-				if project.Environments[i].Name == environmentName {
-					foundEnv = &project.Environments[i]
-					break
+				if environmentName != "" {
+					if project.Environments[i].Name == environmentName {
+						foundEnv = &project.Environments[i]
+						break
+					}
+				} else {
+					if project.Environments[i].EnvironmentType == "production" {
+						foundEnv = &project.Environments[i]
+						break
+					}
 				}
+
 			}
 			if foundEnv == nil {
+				if environmentName == "" {
+					return mcp.NewToolResultError(fmt.Sprintf("no production environment found in project %q", projectName)), nil
+				}
 				return mcp.NewToolResultError(fmt.Sprintf("environment %q not found in project %q", environmentName, projectName)), nil
 			}
 			if foundEnv.Route == "" {
@@ -64,6 +73,8 @@ func mcpToolVerifyRoute(lagoonMCPServer *LagoonMCPServer) {
 			route := foundEnv.Route
 
 			result, err := CheckRoute(ctx, route)
+			result.Project = projectName
+			result.Environment = foundEnv.Name
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("route %q could not be checked: %v", route, err)), nil
 			}
