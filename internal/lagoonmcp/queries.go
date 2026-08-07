@@ -53,6 +53,7 @@ const deploymentsForEnvironmentQuery = `query ($project: Int!, $environment: Str
       started
       completed
       remoteId
+	  buildLog
     }
   }
 }`
@@ -83,6 +84,7 @@ type deploymentDetails struct {
 	Started   string `json:"started,omitempty"`
 	Completed string `json:"completed,omitempty"`
 	Error     string `json:"error,omitempty"`
+	BuildLog  string `json:"buildLog,omitempty"`
 }
 
 type routeStatus struct {
@@ -185,4 +187,53 @@ func getProjectByName(ctx context.Context, lc *lclient.Client, name string) (*re
 	}
 
 	return resp.ProjectByName, nil
+}
+
+func resolveEnvforProject(project *resolvedProject, environmentName string) (*resolvedEnvironment, error) {
+	var resolvedEnv *resolvedEnvironment
+	for i, env := range project.Environments {
+		if env.Name == environmentName {
+			resolvedEnv = &env
+			return resolvedEnv, nil
+		} else if environmentName == "" && env.EnvironmentType == "production" {
+			resolvedEnv = &project.Environments[i]
+			return resolvedEnv, nil
+		}
+	}
+	return nil, fmt.Errorf("environment %q not found in project %q", environmentName, project.Name)
+}
+
+func getLatestDeployment(ctx context.Context, lc *lclient.Client, project uint, environment string) (*deploymentDetails, error) {
+	type envByNameDeployments struct {
+		Deployments []deploymentDetails `json:"deployments"`
+	}
+
+	type envByName struct {
+		EnvironmentByName *envByNameDeployments `json:"environmentByName"`
+	}
+
+	raw, err := lc.ProcessRaw(ctx, deploymentsForEnvironmentQuery, map[string]interface{}{
+		"project":     int(project),
+		"environment": environment,
+		"limit":       1,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp envByName
+	if err := json.Unmarshal(b, &resp); err != nil {
+		return nil, err
+	}
+
+	if resp.EnvironmentByName == nil || len(resp.EnvironmentByName.Deployments) == 0 {
+		return nil, nil
+	}
+
+	return &resp.EnvironmentByName.Deployments[0], nil
 }
