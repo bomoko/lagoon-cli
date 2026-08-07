@@ -21,18 +21,13 @@ var doubleHashRegex = regexp.MustCompile(`(?m)(^#{10,}\n)(^#{10,}\n)`)
 
 func parseBuildLog(buildLog string) (string, error) {
 	buildLog = sanitizeBuildLog(buildLog)
-	fmt.Println("buildlog", buildLog)
 	matches := doubleHashRegex.FindAllStringSubmatchIndex(buildLog, -1)
-	fmt.Println("matches", matches)
 	if len(matches) == 0 {
 		return "", fmt.Errorf("unable to parse build failure")
 	}
 
 	// the last step is typically the fauilure point
 	failureStep := matches[len(matches)-1]
-	fmt.Println("*******failureStep", failureStep)
-	// last[4], last[5] are the start/end indices of capture group 2 -
-	// the second hash line, i.e. the start of the failing step's header.
 	failureLog := strings.TrimSpace(buildLog[failureStep[4]:])
 	if failureLog == "" {
 		return "", fmt.Errorf("no content found after the last step boundary")
@@ -99,8 +94,6 @@ func getDeploymentStatus(lagoonMCPServer *LagoonMCPServer) {
 				return mcp.NewToolResultError(fmt.Sprintf("failed to parse build log: %v", err)), nil
 			}
 
-			// prompt := "Analyse the failed build log, advise the most likely cause and suggest potential steps to resolve it."
-
 			// attempt to constrain the sample repsonse so we don't get slop back
 			prompt := "You are a Lagoon developer assistant analysing a failed build log excerpt. " +
 				"Base your analysis ONLY on evidence present in the log; never invent errors. " +
@@ -131,12 +124,10 @@ func getDeploymentStatus(lagoonMCPServer *LagoonMCPServer) {
 				return mcp.NewToolResultError(fmt.Sprintf("failed to request sampling: %v", err)), nil
 			}
 
-			fmt.Println("res", res)
 			sampleResp, ok := res.Content.(mcp.TextContent)
 			if !ok {
 				return mcp.NewToolResultError("sampling response did not contain text content"), nil
 			}
-			fmt.Println("sampleResp", sampleResp)
 
 			sampleAnalysis := sampleResp.Text
 			if strings.HasPrefix(strings.TrimSpace(sampleResp.Text), "NO_ROOT_CAUSE:") {
