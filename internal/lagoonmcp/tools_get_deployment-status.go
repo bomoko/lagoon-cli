@@ -26,9 +26,9 @@ func parseBuildLog(buildLog string) (string, error) {
 		return "", fmt.Errorf("unable to parse build failure")
 	}
 
-	// the last step is typically the fauilure point
+	// the last step is typically the failure point
 	failureStep := matches[len(matches)-1]
-	failureLog := strings.TrimSpace(buildLog[failureStep[4]:])
+	failureLog := strings.TrimSpace(buildLog[failureStep[5]:])
 	if failureLog == "" {
 		return "", fmt.Errorf("no content found after the last step boundary")
 	}
