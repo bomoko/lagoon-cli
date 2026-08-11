@@ -189,7 +189,7 @@ func getProjectByName(ctx context.Context, lc *lclient.Client, name string) (*re
 	return resp.ProjectByName, nil
 }
 
-func resolveEnvforProject(project *resolvedProject, environmentName string) (*resolvedEnvironment, error) {
+func resolveEnvForProject(project *resolvedProject, environmentName string) (*resolvedEnvironment, error) {
 	var resolvedEnv *resolvedEnvironment
 	for i, env := range project.Environments {
 		if env.Name == environmentName {
