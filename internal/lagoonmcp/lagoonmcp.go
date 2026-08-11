@@ -41,6 +41,8 @@ func NewLagoonMCPServer(lagoonCtx config.Context, cliVersion string) (*LagoonMCP
 		server.WithRecovery(),
 	)
 
+	s.EnableSampling()
+
 	ls := &LagoonMCPServer{
 		Server:          s,
 		NewLagoonClient: newClient,

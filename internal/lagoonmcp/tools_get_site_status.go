@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	lclient "github.com/uselagoon/machinery/api/lagoon/client"
 )
 
 type siteStatusResponse struct {
@@ -128,39 +127,4 @@ func pingRoute(url string) *routeStatus {
 		StatusCode:    resp.StatusCode,
 		XLagoonHeader: resp.Header.Get("x-lagoon"),
 	}
-}
-
-func getLatestDeployment(ctx context.Context, lc *lclient.Client, project uint, environment string) (*deploymentDetails, error) {
-	type envByNameDeployments struct {
-		Deployments []deploymentDetails `json:"deployments"`
-	}
-
-	type envByName struct {
-		EnvironmentByName *envByNameDeployments `json:"environmentByName"`
-	}
-
-	raw, err := lc.ProcessRaw(ctx, deploymentsForEnvironmentQuery, map[string]interface{}{
-		"project":     int(project),
-		"environment": environment,
-		"limit":       1,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	b, err := json.Marshal(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	var resp envByName
-	if err := json.Unmarshal(b, &resp); err != nil {
-		return nil, err
-	}
-
-	if resp.EnvironmentByName == nil || len(resp.EnvironmentByName.Deployments) == 0 {
-		return nil, nil
-	}
-
-	return &resp.EnvironmentByName.Deployments[0], nil
 }
