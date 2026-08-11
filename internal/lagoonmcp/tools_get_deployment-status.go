@@ -62,7 +62,7 @@ func getDeploymentStatus(lagoonMCPServer *LagoonMCPServer) {
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get project %q: %v", project, err)), nil
 			}
 
-			env, err := resolveEnvforProject(project, environment)
+			env, err := resolveEnvForProject(project, environment)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("failed to get environment %q: %v", environment, err)), nil
 			}
